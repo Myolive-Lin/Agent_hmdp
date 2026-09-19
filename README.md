@@ -1,47 +1,41 @@
-# Agent HMDP
+# HMDP Learning Project
 
-一个基于 Spring Boot 的黑马点评学习项目。代码以手敲和理解实现为目标：先完成 Redis Token 登录，再逐步实现商户缓存、秒杀、达人探店、关注 Feed、签到、UV 与附近商户等模块。
+基于 Spring Boot 的黑马点评学习项目。仓库记录从工程底座、Redis Token 登录到商户缓存的手敲实现过程；它是学习中的进行中项目，不是生产系统或黑马官方代码。
 
-## 当前技术栈
+## 当前范围
+
+- Redis Token 手机验证码登录、Token 刷新与登录拦截器
+- 商户与商户分类基础接口
+- 商户缓存：RedisBloom、空值缓存、随机 TTL、热点数据逻辑过期与异步重建
+
+后续计划包括优惠券秒杀、RabbitMQ 异步下单、达人探店、关注 Feed、签到、UV 和附近商户。
+
+## 技术栈
 
 - JDK 8、Spring Boot 2.3.12、MyBatis-Plus 3.4.3
-- MySQL 8、Redis 8、RedisBloom
-- Hutool、Lombok
-
-## 当前进度
-
-- Redis Token 手机验证码登录
-- 登录拦截器与 Token 刷新
-- 商户、商户分类基础结构
-- 商户缓存：Bloom Filter、空值缓存、随机 TTL、热点逻辑过期与异步重建（进行中）
+- MySQL、Redis 8 / RedisBloom
+- Lombok、Hutool
 
 ## 本地运行
 
-1. 安装 JDK 8、MySQL 和 Redis 8。
-2. 创建数据库 `dianping_learning`，并导入所需的 `tb_user`、`tb_shop`、`tb_shop_type` 数据。
-3. 复制配置模板并填写本机账号：
+1. 准备 JDK 8、MySQL 与 Redis 8。
+2. 创建 `dianping_learning` 数据库并准备 `tb_user`、`tb_shop`、`tb_shop_type` 表及测试数据。
+3. 创建本地配置：
 
    ```bash
    cp src/main/resources/application-example.yaml src/main/resources/application.yaml
    ```
 
-4. 在 IDE 中运行 `com.hmdp.DianpingLearningApplication`。
+4. 修改 `application.yaml` 中的数据库账号、密码和热点商户 ID。
+5. 在 IDE 中运行 `com.hmdp.DianpingLearningApplication`。
 
-本仓库忽略 `application.yaml`，避免提交数据库密码。
+`application.yaml` 已被 Git 忽略，避免提交本机凭据。
 
 ## 参考与致谢
 
-本项目是个人学习过程中的手敲实现，并非从零定义业务需求。商户点评领域模型、课程主题、基础接口设计与部分实现思路参考了以下本地项目：
+本仓库中的代码由学习者在学习过程中手敲、调整和维护；业务题材、模块划分、领域模型及部分实现思路参考了以下开源项目。它们的源码、前端资源和数据库文件均未包含在本仓库中。
 
-- `../dianping`：提供黑马点评主线实现的代码对照，尤其是 `CacheClient`、商户分类缓存、逻辑过期和 GEO 查询思路。
-- `../dianping_STMP`：提供 SMTP 登录扩展和缓存策略教学对照，包括缓存穿透、互斥锁、逻辑过期等不同方案的比较素材。
+- [KNeegcyao/dianping](https://github.com/KNeegcyao/dianping)：作为黑马点评完整实现的主线代码对照，主要参考 Redis Token 登录、商户缓存、分类缓存、逻辑过期、GEO 查询及 Redis 数据结构的应用思路。
+- [haopengmai/dianping](https://github.com/haopengmai/dianping)：作为扩展实现对照，主要参考 SMTP 邮箱验证码、RabbitMQ 异步秒杀、令牌桶限流和基于 Redis ZSet 时间窗口的登录限流思路。
 
-这两个参考项目的源码**不包含**在本仓库中。本仓库只提交学习者在 `dianping-learning` 中手敲、调整和维护的代码；在此感谢原项目及课程作者提供的学习材料。
-
-## 学习原则
-
-- 以可运行的完整模块为单位迭代。
-- 不为教学保留需要推翻的临时架构。
-- 普通商户采用 Cache Aside、空值缓存与随机 TTL。
-- 热点商户采用逻辑过期、随机 owner 锁和 Lua 安全解锁。
-- RedisBloom 用于前置过滤无效商户 ID，空值缓存仍用于处理 Bloom 假阳性。
+感谢上述项目作者及黑马点评课程提供的学习材料。若本仓库后续采用或改编了其他开源代码，会在对应提交或文档中继续标注来源。
