@@ -1,0 +1,12 @@
+# Maven
+target/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+
+# Local runtime configuration: do not publish database credentials.
+src/main/resources/application.yaml
+
+# Operating system files
+.DS_Store
