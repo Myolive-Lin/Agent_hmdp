@@ -46,5 +46,10 @@ public final class RedisConstants {
     // RedisBloom的key，不设置TTL
     public static final String SHOP_BLOOM_KEY = "bf:shop:id";
 
+    // 库存
+    public static final String SECKILL_STOCK_KEY = "seckill:stock:";
+
+    // 用户Order
+    public static final String SECKILL_ORDER_KEY = "seckill:order:";
 
 }
