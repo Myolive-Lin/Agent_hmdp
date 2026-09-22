@@ -5,9 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
 import com.hmdp.dto.RedisData;
-import com.sun.org.apache.xpath.internal.operations.Bool;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.core.task.TaskRejectedException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -36,11 +34,11 @@ public class CacheClient {
     private static final DefaultRedisScript<Long> UNLOCK_SCRIPT;
 
     static {
-        UNLOCK_SCRIPT = new DefaultRedisScript<Long>();
+        UNLOCK_SCRIPT = new DefaultRedisScript<>();
         UNLOCK_SCRIPT.setScriptText(
-                "if redis.call('get', KEYS[1] == ARGV[1])"
-                + "then return redis.call('del', KEYS[1])"
-                +"else return 0 end"
+                "if redis.call('get', KEYS[1]) == ARGV[1] "
+                + "then return redis.call('del', KEYS[1]) "
+                + "else return 0 end"
         );
         UNLOCK_SCRIPT.setResultType(Long.class);
     }
@@ -126,6 +124,7 @@ public class CacheClient {
                     "",
                     RedisConstants.CACHE_NULL_TTL,
                     TimeUnit.MINUTES);
+            return null;
         }
 
         //存在，存储加上随机，防止缓存雪崩
@@ -192,7 +191,7 @@ public class CacheClient {
                                 log.error("热点缓存重建失败，key={}", key, e);
                             } finally {
                                 // Lua 比较owner后删除，避免误删其他线程的锁
-                                unlock(key, owner);
+                                unlock(lockKey, owner);
                             }
                         }
                 );
@@ -200,8 +199,8 @@ public class CacheClient {
         }catch (TaskRejectedException e){
             // 线程池满时，当前线程未执行，当前线程必须释放自己的锁。
 
-            unlock(key, owner);
-            log.warn("缓存重建线程池繁忙，key={}", key);
+            unlock(lockKey, owner);
+            log.warn("热点缓存重建线程池繁忙，key={}", lockKey);
         }
 
         // 逻辑过期后，仍然返回旧数据
