@@ -1,6 +1,8 @@
 package com.hmdp.service.impl;
 
 import cn.hutool.bloomfilter.BloomFilter;
+import cn.hutool.core.util.StrUtil;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.config.ShopCacheProperties;
 import com.hmdp.dto.Result;
@@ -10,6 +12,9 @@ import com.hmdp.service.IShopService;
 import com.hmdp.utils.CacheClient;
 import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.ShopBloomFilter;
+import com.hmdp.utils.SystemConstants;
+import org.springframework.data.geo.*;
+import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionManager;
@@ -18,6 +23,7 @@ import org.springframework.transaction.support.TransactionSynchronizationAdapter
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import javax.annotation.Resource;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 
@@ -37,6 +43,7 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     private final ShopCacheProperties shopCacheProperties;
     private final ShopBloomFilter shopBloomFilter;
 
+
     public ShopServiceImpl(
             StringRedisTemplate stringRedisTemplate,
             CacheClient cacheClient,
@@ -49,6 +56,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         this.shopCacheProperties = shopCacheProperties;
     }
 
+    /**
+     * 根据 id 查询商户详情。
+     */
     @Override
     public Result queryById(Long id) {
         if (id == null || id <= 0L){
@@ -100,6 +110,9 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
     }
 
 
+    /**
+     * 新增商户。
+     */
     @Override
     @Transactional
     public Result saveShop(Shop shop) {
@@ -151,7 +164,6 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
      * 先更新MySQL，提交成功后删除Redis，
      * 下一次查询中会从MySQL读取最新值，并写回缓存。
      */
-
     @Override
     @Transactional
     public Result update(Shop shop) {
@@ -179,6 +191,107 @@ public class ShopServiceImpl extends ServiceImpl<ShopMapper, Shop> implements IS
         });
 
         return  Result.ok();
+
+    }
+
+    /**
+     * 按类型查询商户。
+     *
+     * 示例：
+     * /shop/of/type?typeId=1&current=1
+     * /shop/of/type?typeId=1&current=1&x=120.149&y=30.334
+     */
+    @Override
+    public Result queryShopByType(Integer typeId, Integer current, Double x, Double y) {
+        if (typeId == null || current == null || current < 1) {
+            return Result.fail("请求参数错误");
+        }
+
+        /*
+         * 未上传用户位置：
+         * 无法计算距离，使用 MySQL 的普通分页查询。
+         */
+        if (x == null || y == null) {
+            Page<Shop> shopPage = query()
+                    .eq("type_id", typeId)
+                    .page(new Page<>(current, SystemConstants.DEFAULT_PAGE_SIZE));
+
+            return Result.ok(shopPage.getRecords());
+        }
+        /*
+         * 上传了位置：
+         * 到 Redis GEO 中按距离查询店铺 ID。
+         */
+        int from = (current - 1) * SystemConstants.DEFAULT_PAGE_SIZE;
+        int end = current * SystemConstants.DEFAULT_PAGE_SIZE;
+
+        String key = RedisConstants.SHOP_GEO_KEY + typeId;
+
+        /*
+         * 数据格式
+           results
+            └── content
+                ├── GeoResult
+                │   ├── content
+                │   │   └── name = "101"
+                │   └── distance = 200m
+         */
+        GeoResults<RedisGeoCommands.GeoLocation<String>> results = stringRedisTemplate.opsForGeo().radius(
+                        key,
+                        new Circle(
+                                new Point(x,y),
+                                new Distance(5000)
+                        ),
+                        RedisGeoCommands.GeoRadiusCommandArgs
+                                .newGeoRadiusArgs()
+                                .includeDistance()
+                                .sortAscending()
+                                .limit(end)
+                );
+
+        if (results == null) {
+            return Result.ok(Collections.emptyList());
+        }
+
+        List<GeoResult<RedisGeoCommands.GeoLocation<String>>> content = results.getContent();
+        // 当前页开始位置已超出查询结果，说明没有更多店铺。
+        if (content.size() <= from) {
+            return Result.ok(Collections.emptyList());
+        }
+
+        /*
+         * Redis返回：
+         *  shop_id + distance
+         * MySQL 负责查询完整店铺数据
+         */
+        List<Long> shopIds = new ArrayList<Long>();
+        Map<String, Distance> distanceMap = new HashMap<String, Distance>();
+
+        content.stream()
+                .skip(from)
+                .forEach(result ->{
+                        String shopId = result.getContent().getName();
+                                shopIds.add(Long.valueOf(shopId));
+                                distanceMap.put(shopId, result.getDistance());
+                    });
+
+        /*
+         * IN 查询本身不保证顺序。
+         * ORDER BY FIELD 让 MySQL 结果保持 Redis 按距离排序的顺序。
+         */
+        String idStr = StrUtil.join(",",shopIds);
+        List<Shop> shops= query()
+                .in("id", shopIds)
+                .last("ORDER BY FIELD(id,"+idStr+")")
+                .list();
+
+        // 将 Redis 返回的距离填充到非数据库字段 distance。
+        for (Shop shop : shops){
+            Distance distance = distanceMap.get(shop.getId().toString());
+            shop.setDistance(distance.getValue());
+        }
+
+        return Result.ok(shops);
 
     }
 

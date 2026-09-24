@@ -10,7 +10,7 @@ spring:
 
   redis:
     host: 127.0.0.1
-    port: 6379
+    port: 6380
     password:
     database: 0
     timeout: 3s

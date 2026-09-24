@@ -61,6 +61,12 @@ public final class RedisConstants {
     public static final String FEED_KEY = "feed:";
 
     /**
+     * 商户地理位置：
+     * 例如 shop:geo:1，表示 typeId=1 的商户坐标集合。
+     */
+    public static final String SHOP_GEO_KEY = "shop:geo:";
+
+    /**
      * 用户月度签到 Bitmap。
      * 示例：sign:5:202609
      */
