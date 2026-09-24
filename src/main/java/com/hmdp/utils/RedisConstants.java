@@ -60,4 +60,17 @@ public final class RedisConstants {
     //每个用户的Feed收件箱
     public static final String FEED_KEY = "feed:";
 
+    /**
+     * 用户月度签到 Bitmap。
+     * 示例：sign:5:202609
+     */
+    public static final String USER_SIGN_KEY = "sign:";
+
+
+    /**
+     * 每日页面 UV 的 HyperLogLog。
+     * 示例：uv:home:20260924
+     */
+    public static final String UV_KEY = "uv:";
+
 }

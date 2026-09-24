@@ -17,10 +17,14 @@ import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.connection.BitFieldSubCommands;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import cn.hutool.core.lang.UUID;
@@ -119,6 +123,79 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         stringRedisTemplate.delete(RedisConstants.LOGIN_USER_KEY+token);
         UserHolder.removeUser();
         return Result.ok();
+    }
+
+    @Override
+    public Result sign() {
+        Long userId = UserHolder.getUser().getId();
+
+        LocalDateTime now = LocalDateTime.now();
+
+        /*
+         * 拼接redis key
+         */
+        String suffix = now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
+        String key = RedisConstants.USER_SIGN_KEY +userId+suffix;
+
+
+        /*
+         * 4. 日期映射为 Bitmap 下标：
+         * 1 号 -> offset 0
+         * 2 号 -> offset 1
+         * 第 d 天 -> offset d - 1
+         */
+        int dayOfMonth = now.getDayOfMonth();
+        stringRedisTemplate.opsForValue().setBit(key, dayOfMonth - 1, true);
+        return Result.ok();
+    }
+
+    @Override
+    public Result signCount() {
+        // 1. 获取当前登录用户
+        Long userId = UserHolder.getUser().getId();
+
+        // 2. 获取当前日期
+        LocalDateTime now = LocalDateTime.now();
+
+        // 3. 计算本月签到 Key
+        String suffix = now.format(DateTimeFormatter.ofPattern(":yyyyMM"));
+        int dayOfMonth = now.getDayOfMonth();
+        String key = RedisConstants.USER_SIGN_KEY + userId + suffix;
+        List<Long> result = stringRedisTemplate.opsForValue()
+                .bitField(
+                        key,
+                        BitFieldSubCommands.create()
+                                .get(
+                                        BitFieldSubCommands.BitFieldType.unsigned(dayOfMonth)
+                                ).valueAt(0)
+                );
+
+        if (result == null || result.isEmpty()) {
+            // 没有任何签到结果
+            return Result.ok(0);
+        }
+
+        Long num = result.get(0);
+        if (num == null || num == 0L) {
+            return Result.ok(0);
+        }
+
+        /*
+         * 6. 从最低位开始统计连续的 1。
+         *
+         * 最低位是今天：
+         * 1 表示今天签到，继续检查昨天；
+         * 0 表示断签，停止统计。
+         */
+        int count = 0;
+        while ((num & 1L) == 1L) {
+            count++;
+            num >>>= 1;
+        }
+
+        return Result.ok(count);
+
+
     }
 
     private User createWithPhone(String phone){
