@@ -3,10 +3,7 @@ package com.hmdp.controller;
 import com.hmdp.dto.Result;
 import com.hmdp.entity.Voucher;
 import com.hmdp.service.IVoucherService;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/voucher")
@@ -21,5 +18,10 @@ public class VoucherController {
     public Result addSeckillVoucher(@RequestBody Voucher voucher){
         return voucherService.addSeckillVoucher(voucher);
         //添加Voucher
+    }
+
+    @GetMapping("/list/{shopId}")
+    public Result queryVoucherOfShop(@PathVariable("shopId") Long shopId){
+        return voucherService.queryVoucherOfShop(shopId);
     }
 }

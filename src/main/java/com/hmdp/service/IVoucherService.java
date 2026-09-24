@@ -6,4 +6,6 @@ import com.hmdp.entity.Voucher;
 
 public interface IVoucherService extends IService<Voucher> {
     Result addSeckillVoucher(Voucher voucher);
+
+    Result queryVoucherOfShop(Long shopId);
 }

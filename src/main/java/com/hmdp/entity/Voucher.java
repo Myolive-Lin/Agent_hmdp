@@ -16,9 +16,14 @@ public class Voucher {
 
     private Long shopId;
     private String title;
+    private String subTitle;
+    //使用规则
+    private String rules;
     private Long payValue;
     private Long actualValue;
+    // 优惠券类型：0 普通券，1 秒杀券
     private Integer type;
+    // 状态：1 正常，2 下架，3 过期
     private Integer status;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;

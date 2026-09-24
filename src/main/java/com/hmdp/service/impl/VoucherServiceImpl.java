@@ -81,4 +81,9 @@ public class VoucherServiceImpl extends ServiceImpl<VoucherMapper, Voucher> impl
 
         return Result.ok(voucherId);
     }
+
+    @Override
+    public Result queryVoucherOfShop(Long shopId) {
+        return Result.ok(baseMapper.queryVoucherOfShop(shopId));
+    }
 }

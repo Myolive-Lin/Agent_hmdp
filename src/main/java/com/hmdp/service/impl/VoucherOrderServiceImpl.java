@@ -118,4 +118,28 @@ public class VoucherOrderServiceImpl extends ServiceImpl<VoucherOrderMapper, Vou
         // 此时只代表被受理
         return Result.ok(orderId);
     }
+
+    @Override
+    public Result queryOrderById(Long orderId) {
+        if (orderId == null || orderId <= 0){
+            return Result.fail("订单ID不合法");
+        }
+
+        UserDTO user = UserHolder.getUser();
+        if (user == null || user.getId() == null){
+            return Result.fail("请先登录");
+        }
+
+        VoucherOrder order = getById(orderId);
+
+        if (order == null){
+            return Result.fail("订单不存在或正在处理中");
+        }
+
+        if(!user.getId().equals( order.getUserId())){
+            return Result.fail("无权查询该订单");
+        }
+        return Result.ok(order);
+
+    }
 }
