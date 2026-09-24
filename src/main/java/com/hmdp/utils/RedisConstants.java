@@ -52,4 +52,12 @@ public final class RedisConstants {
     // 用户Order
     public static final String SECKILL_ORDER_KEY = "seckill:order:";
 
+    public static final String BLOG_LIKED_KEY = "blog:liked:";
+
+    //当前用户关注的用户ID集合
+    public static final String FOLLOW_KEY = "follows:";
+
+    //每个用户的Feed收件箱
+    public static final String FEED_KEY = "feed:";
+
 }

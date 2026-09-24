@@ -5,16 +5,20 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.hmdp.dto.Result;
+import com.hmdp.dto.ScrollResult;
 import com.hmdp.dto.UserDTO;
 import com.hmdp.entity.Blog;
+import com.hmdp.entity.Follow;
 import com.hmdp.entity.User;
 import com.hmdp.mapper.BlogMapper;
 import com.hmdp.service.IBlogService;
+import com.hmdp.service.IFollowService;
 import com.hmdp.service.IUserService;
 import com.hmdp.utils.RedisConstants;
 import com.hmdp.utils.SystemConstants;
 import com.hmdp.utils.UserHolder;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -27,6 +31,9 @@ import static com.baomidou.mybatisplus.core.toolkit.StringUtils.replaceBlank;
 
 @Service
 public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IBlogService {
+
+    @Resource
+    private IFollowService followService;
 
     @Resource
     private IUserService userService;
@@ -95,6 +102,7 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
 
     @Override
     public Result saveBlog(Blog blog) {
+        //保存成功后，将 blogId 写入每个粉丝的 Feed 收件箱
         UserDTO userDTO = UserHolder.getUser();
         blog.setUserId(userDTO.getId());
 
@@ -104,7 +112,104 @@ public class BlogServiceImpl extends ServiceImpl<BlogMapper, Blog> implements IB
             return Result.fail("新增笔记失败");
         }
 
+        /*
+         * 查询作者的粉丝：
+         * tb_follow.user_id 是粉丝，
+         * tb_follow.follow_user_id 是作者。
+         */
+        List<Follow> fans = followService.query().eq("follow_user_id", userDTO.getId()).list();
+        long publishTime = System.currentTimeMillis();
+
+        for (Follow fan : fans){
+            String key = RedisConstants.FEED_KEY + fan.getUserId();
+            stringRedisTemplate.opsForZSet().add(
+                    key, blog.getId().toString(),publishTime
+            );
+        }
         return Result.ok(blog.getId());
+    }
+
+    /**
+     * 查询当前用户的 Feed。
+     *
+     * 第一次请求：
+     * maxTime = Long.MAX_VALUE
+     * offset = 0
+     *
+     * 下一次请求使用上一次响应的 minTime 和 offset。
+     */
+    @Override
+    public Result queryBlogOfFollow(Long maxTime, Integer offset) {
+
+
+    UserDTO userDTO =  UserHolder.getUser();
+
+    long max = maxTime == null ? Long.MAX_VALUE : maxTime;
+    int currentOffset = offset == null ? 0 : offset;
+
+    String key = RedisConstants.FEED_KEY + userDTO.getId();
+    final int pageSize = 2;
+
+    Set<ZSetOperations.TypedTuple<String>>  tuples= stringRedisTemplate
+                .opsForZSet().reverseRangeByScoreWithScores(
+                        key,
+                        0,
+                        max,
+                        currentOffset,
+                        pageSize
+                );
+
+    if (tuples == null || tuples.isEmpty()){
+        return Result.ok(new ScrollResult(Collections.emptyList(), 0L, 0));
+    }
+
+    List<Long> blogIds = new ArrayList<Long>(tuples.size());
+    long minTime = 0L;
+    int sameCount = 0;
+
+    for(ZSetOperations.TypedTuple<String> tuple: tuples){
+        blogIds.add(Long.valueOf(tuple.getValue()));
+
+        long time = tuple.getScore().longValue();
+
+        if(time == minTime){
+            sameCount++;
+        }else{
+            minTime = time;
+            sameCount = 1;
+        }
+    }
+
+    /*
+     * Redis 的IN 查询不保证返回顺序
+     * 使用FIELD 保持FEED的时间倒序
+     */
+    String idStr = StrUtil.join(",", blogIds);
+    List<Blog> blogs = query()
+            .in("id", blogIds)
+            .last("ORDER BY FIELD(id," + idStr + ")")
+            .list();
+
+    for (Blog blog : blogs){
+        queryBlogUser(blog);
+        isBlogLiked(blog);
+    }
+
+
+        /*
+         * 当前页最小时间仍等于本次 max 时，
+         * 说明同一毫秒的数据跨页了，需要累加旧 offset。
+         */
+        int nextOffset = (minTime == max ? currentOffset : 0) + sameCount;
+
+        ScrollResult result = new ScrollResult(
+                blogs,
+                minTime,
+                nextOffset
+        );
+
+        return Result.ok(result);
+
     }
 
 
