@@ -52,7 +52,51 @@ const K={
  '第 8 课':['GEOADD','GEOSEARCH','经纬度','距离排序','分页','MySQL 保序'],
  '复盘':['回归测试','唯一索引','配置管理','可复现性','边界分析']
 };
+const T={
+ '课程导览':['阅读 lessons/ 中的课程文档','用课程对应测试验证一个业务闭环'],
+ '第 1 课':['验证码过期和错误验证码','首次登录创建用户、Token 续期、退出后失效'],
+ '第 2、3 课':['缓存命中、空值缓存、逻辑过期','更新商户后旧缓存是否删除'],
+ '第 4 课':['限流、库存不足与一人一单','重复消息不重复建单、库存不为负'],
+ '第 5 课':['发布者必须是当前用户','点赞切换、点赞榜时间顺序、热榜分页'],
+ '第 6 课':['重复关注、共同关注、Feed 推送','同毫秒博客跨页时不重复、不遗漏'],
+ '第 7 课':['月初、断签、连续签到统计','HLL 重复 visitorId 不增加 UV'],
+ '第 8 课':['5km 边界、距离升序和分页','无坐标普通分页、MySQL 回查保序'],
+ '复盘':['mvn test 与基础设施连接','唯一索引、重复订单和负库存 SQL 核查']
+};
+const F={
+ '课程导览':['lessons/*.md','src/test/java/com/hmdp/'],
+ '第 1 课':['UserController.java','UserServiceImpl.java','RefreshTokenInterceptor.java'],
+ '第 2、3 课':['ShopServiceImpl.java','CacheClient.java','ShopBloomFilter.java'],
+ '第 4 课':['VoucherOrderServiceImpl.java','SeckillOrderListener.java','seckill.lua'],
+ '第 5 课':['BlogController.java','BlogServiceImpl.java','UploadController.java'],
+ '第 6 课':['FollowServiceImpl.java','BlogServiceImpl.java','ScrollResult.java'],
+ '第 7 课':['UserServiceImpl.java','UserSignUvIntegrationTest.java','RedisConstants.java'],
+ '第 8 课':['ShopServiceImpl.java','ShopGeoDataLoaderTest.java','ShopController.java'],
+ '复盘':['VoucherModuleIntegrationTest.java','FollowFeedIntegrationTest.java','README.md']
+};
+const SUB=['业务概览','规则与数据','链路与代码','知识点与验证'];
+const P=L.flatMap((lesson,course)=>SUB.map((sub,part)=>({lesson,course,part,sub})));
 let n=0;const q=s=>document.querySelector(s),esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
-function draw(){const x=L[n];q('#page').style.animation='none';void q('#page').offsetWidth;q('#page').style.animation='';q('#page').innerHTML=`<div class="kicker">${x[0]}</div><h2>${x[1]}</h2><div class="summary"><b>结论先行：</b>${x[7]}</div><p class="lead">${x[2]}</p><div class="section-label">一、业务逻辑：按步骤理解</div><ol class="steps">${B[x[0]].map(i=>`<li>${i}</li>`).join('')}</ol><div class="section-label">二、关键规则与数据设计</div><div class="grid"><section class="block"><h3>${x[3][0]}</h3><p>${x[3][1]}</p></section><section class="block"><h3>${x[4][0]}</h3><p>${x[4][1]}</p></section></div><div class="section-label">三、完整业务链路</div><div class="flow">${x[5].split(' → ').map(i=>`<span>${i}</span>`).join('')}</div><div class="section-label">四、核心代码</div><pre><code>${esc(x[6])}</code></pre><p class="code-note"><b>代码注释：</b>${N[x[0]]}</p><div class="section-label">五、需要掌握的知识点</div><div class="knowledge">${K[x[0]].map(i=>`<span>${i}</span>`).join('')}</div><div class="take"><b>六、本课复盘：</b>${x[7]} 复习时应能说清每个 Key、表字段或消息各自保存什么，以及它如何保证业务规则。</div>`;q('#number').textContent=String(n+1).padStart(2,'0')+' / '+String(L.length).padStart(2,'0');q('#prev').disabled=!n;q('#next').disabled=n===L.length-1;document.querySelectorAll('.toc').forEach((b,i)=>b.classList.toggle('active',i===n))}
-L.forEach((x,i)=>{let b=document.createElement('button');b.className='toc';b.textContent=x[0];b.onclick=()=>{n=i;draw()};q('#toc').append(b)});q('#prev').onclick=()=>{if(n){n--;draw()}};q('#next').onclick=()=>{if(n<L.length-1){n++;draw()}};addEventListener('keydown',e=>{if(e.key==='ArrowLeft')q('#prev').click();if(e.key==='ArrowRight')q('#next').click()});draw();
+function header(p){return `<div class="kicker">${p.lesson[0]} · ${p.part+1}/4 · ${p.sub}</div><h2>${p.lesson[1]}</h2>`}
+function draw(){
+ const p=P[n],x=p.lesson,key=x[0];
+ q('#page').style.animation='none';void q('#page').offsetWidth;q('#page').style.animation='';
+ let content='';
+ if(p.part===0){
+   content=`<div class="summary"><b>结论先行：</b>${x[7]}</div><p class="lead">${x[2]}</p><div class="section-label">本页学习目标</div><ol class="steps">${B[key].map(i=>`<li>${i}</li>`).join('')}</ol><div class="take"><b>学习方式：</b>先从业务动作理解为什么需要 Redis 或消息队列，再阅读下一页的数据与约束。</div>`;
+ } else if(p.part===1){
+   content=`<div class="summary"><b>先看数据：</b>业务规则只有落实到 Key、表字段和唯一约束后，才能在并发场景中成立。</div><div class="section-label">关键规则与数据设计</div><div class="grid"><section class="block"><h3>${x[3][0]}</h3><p>${x[3][1]}</p></section><section class="block"><h3>${x[4][0]}</h3><p>${x[4][1]}</p></section></div><div class="section-label">项目中的对应文件</div><ol class="steps">${F[key].map(i=>`<li><code>${i}</code></li>`).join('')}</ol><div class="take"><b>要记住：</b>Redis 通常保存高频状态、排序或索引；MySQL 保存需要长期一致的实体和关系。</div>`;
+ } else if(p.part===2){
+   content=`<div class="summary"><b>链路核心：</b>${N[key]}</div><div class="section-label">完整业务链路</div><div class="flow">${x[5].split(' → ').map(i=>`<span>${i}</span>`).join('')}</div><div class="section-label">核心代码</div><pre><code>${esc(x[6])}</code></pre><p class="code-note"><b>代码注释：</b>${N[key]}</p><div class="take"><b>阅读代码的顺序：</b>先确认输入和当前用户，再看 Redis 判断或查询，最后看 MySQL、MQ 和返回结果。</div>`;
+ } else {
+   content=`<div class="summary"><b>本课复盘：</b>${x[7]}</div><div class="section-label">需要掌握的知识点</div><div class="knowledge">${K[key].map(i=>`<span>${i}</span>`).join('')}</div><div class="section-label">验证与测试</div><ol class="steps">${T[key].map(i=>`<li>${i}</li>`).join('')}</ol><div class="section-label">自检问题</div><div class="grid"><section class="block"><h3>为什么这样设计？</h3><p>能说明每个 Key、表或消息保存的内容，以及它替代了什么低效操作。</p></section><section class="block"><h3>如何保证正确？</h3><p>能指出校验、唯一索引、条件更新、幂等或测试中承担最终保护的部分。</p></section></div><div class="take"><b>完成标准：</b>不看代码也能讲清业务流程；回到代码时能定位 Controller、Service、Redis Key 与测试文件。</div>`;
+ }
+ q('#page').innerHTML=header(p)+content;
+ q('#number').textContent=String(n+1).padStart(2,'0')+' / '+String(P.length).padStart(2,'0');
+ q('#prev').disabled=!n;q('#next').disabled=n===P.length-1;
+ document.querySelectorAll('.toc').forEach((b,i)=>b.classList.toggle('active',i===p.course));
+}
+L.forEach((x,i)=>{let b=document.createElement('button');b.className='toc';b.textContent=x[0];b.onclick=()=>{n=i*4;draw()};q('#toc').append(b)});
+q('#prev').onclick=()=>{if(n){n--;draw()}};q('#next').onclick=()=>{if(n<P.length-1){n++;draw()}};
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft')q('#prev').click();if(e.key==='ArrowRight')q('#next').click()});draw();
 </script></body></html>
